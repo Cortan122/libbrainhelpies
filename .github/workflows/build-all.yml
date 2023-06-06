@@ -1,0 +1,30 @@
+name: build-all
+
+on:
+  pull_request:
+  push:
+    branches: [master]
+
+defaults:
+  run:
+    shell: bash
+    working-directory: test/
+
+jobs:
+  build-ubuntu:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - run: CC=gcc make -B
+    - run: CC=clang make -B
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v3
+    - run: make -B
+      env:
+        CC: gcc
+    - run: make -B
+      env:
+        CC: clang

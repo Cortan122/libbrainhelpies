@@ -1,0 +1,17 @@
+name: run-tests
+
+on:
+  pull_request:
+  push:
+
+defaults:
+  run:
+    shell: bash
+    working-directory: test/
+
+jobs:
+  run-tests:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+    - run: make run_tests
