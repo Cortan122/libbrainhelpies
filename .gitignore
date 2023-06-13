@@ -1,7 +1,9 @@
 *.o
+*.exe
 stb_ds.h
 munit.h
 munit.c
 .vscode/
 test/main
 test/test
+out.zip

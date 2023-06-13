@@ -137,6 +137,29 @@ MunitResult test_vfs_zipread(const MunitParameter* params, void* user_data){
   return MUNIT_OK;
 }
 
+MunitResult test_vfs_zippattern(const MunitParameter* params, void* user_data){
+  (void)params;
+  (void)user_data;
+
+  VFS* zip = VFS_create("../assets/demo.zip", VFS_ZIP);
+  VFS_findFilesWithPattren(zip, "*.c", "output/*.exe");
+  VFS_commitRead(zip);
+
+  static const char* rom[] = {
+    "output/diagnostic.exe",
+    "output/main.exe",
+    "output/VFS.exe",
+  };
+
+  assert_size(zip->files_count, ==, 3);
+  for(size_t i = 0; i < zip->files_count; i++){
+    assert_string_equal(zip->files[i].destpath, rom[i]);
+  }
+
+  VFS_delete(zip);
+  return MUNIT_OK;
+}
+
 MunitResult test_vfs_zipwrite(const MunitParameter* params, void* user_data){
   (void)params;
   (void)user_data;
@@ -182,6 +205,7 @@ MunitTest tests[] = {
   {.name = "/wildcard/glob", .test = test_wildcard_glob},
 
   {.name = "/vfs/zip_read", .test = test_vfs_zipread},
+  {.name = "/vfs/zip_read_pattern", .test = test_vfs_zippattern},
   {.name = "/vfs/zip_write", .test = test_vfs_zipwrite},
   {0}
 };

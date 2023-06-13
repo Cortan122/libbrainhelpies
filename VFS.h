@@ -27,6 +27,9 @@ typedef struct VFSFile {
 
   bool disk_valid;
   char* disk_path;
+
+  bool destpath_owned;
+  char* destpath;
 } VFSFile;
 
 typedef struct VFS {
@@ -43,11 +46,14 @@ typedef struct VFS {
 VFS* VFS_create(char* uri, VFSType type);
 void VFS_delete(VFS* vfs);
 
-int VFS_findFiles(VFS* vfs, char* path);
+int VFS_findFiles(VFS* vfs, const char* path);
+int VFS_findFilesWithPattren(VFS* vfs, const char* path, const char* pattern);
 int VFS_commitRead(VFS* vfs);
 
 int VFS_writeMemory(VFS* vfs, char* file, void* buffer, size_t length);
 int VFS_commitWrite(VFS* vfs);
 
 VFSFile* VFSFile_makeMemory(VFS* vfs, const char* name, size_t length);
+int VFSFile_ensureMemory(VFSFile* file);
+void VFSFile_computeDestination(VFSFile* file, const char* pattern);
 void VFSFile_delete(VFSFile* file);

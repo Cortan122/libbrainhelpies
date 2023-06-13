@@ -5,6 +5,7 @@
 
 #include "diagnostic.h"
 #include "wildcard.h"
+#include "shutil.h"
 
 #pragma directory("https://github.com/nothings/stb")
 #include "stb_ds.h"
@@ -14,14 +15,19 @@
 
 #define VFS_NOTSUPPORTED(vfs) fprintf(stderr, INFO"VFS of type %d does not support operation %s\n", vfs->type, __func__)
 #define VFS_READABLE(vfs) \
-  if(!vfs->can_read){     \
+  if(!(vfs)->can_read){   \
     fprintf(stderr, ERROR"a VFS must be readable to support operation %s\n", __func__); \
     return -1;            \
   }
 #define VFS_WRITABLE(vfs) \
-  if(!vfs->can_write){    \
+  if(!(vfs)->can_write){  \
     fprintf(stderr, ERROR"a VFS must be writable to support operation %s\n", __func__); \
     return -1;            \
+  }
+#define VFSFILE_VALID(file) \
+  if(!(file)->is_valid){    \
+    fprintf(stderr, ERROR"trying operation %s on an invalid file '%s'\n", __func__, (file)->path); \
+    return -1;              \
   }
 
 static void* VFSzip_makeOpaque(char* uri){
@@ -120,12 +126,13 @@ void VFS_delete(VFS* vfs){
   free(vfs);
 }
 
-int VFS_findFiles(VFS* vfs, char* path){
+int VFS_findFiles(VFS* vfs, const char* path){
   VFS_READABLE(vfs);
+  int res = 0;
 
   switch(vfs->type){
     case VFS_ZIP: {
-      return VFSzip_findFiles(vfs, path);
+      res = VFSzip_findFiles(vfs, path);
     } break;
 
     case VFS_NONE:
@@ -133,7 +140,21 @@ int VFS_findFiles(VFS* vfs, char* path){
   }
 
   vfs->files_count = arrlen(vfs->files);
-  return 0;
+  return res;
+}
+
+int VFS_findFilesWithPattren(VFS* vfs, const char* path, const char* pattern){
+  VFS_READABLE(vfs);
+
+  int old_count = arrlen(vfs->files);
+  int res = VFS_findFiles(vfs, path);
+  int new_count = arrlen(vfs->files);
+
+  for(int i = old_count; i < new_count; i++){
+    VFSFile_computeDestination(&vfs->files[i], pattern);
+  }
+
+  return res;
 }
 
 int VFS_commitRead(VFS* vfs){
@@ -154,6 +175,7 @@ int VFS_commitRead(VFS* vfs){
 
 int VFS_writeMemory(VFS* vfs, char* file, void* buffer, size_t length){
   VFS_WRITABLE(vfs);
+  // note: the lifetime of [buffer] must be longer then the lifelime of [vfs], if using VFS_ZIP
 
   switch(vfs->type){
     case VFS_ZIP: {
@@ -199,11 +221,74 @@ VFSFile* VFSFile_makeMemory(VFS* vfs, const char* name, size_t length){
   return &vfs->files[arrlen(vfs->files)-1];
 }
 
+void VFSFile_computeDestination(VFSFile* file, const char* pattern){
+  if(strchr(pattern, '*') == NULL){
+    file->destpath_owned = false;
+    file->destpath = (char*)pattern;
+    return;
+  }
+
+  const char* name_start = strrchr(file->path, '/');
+  if(name_start == NULL)name_start = file->path;
+  else name_start += 1;
+  const char* name_end = strrchr(file->path, '.');
+  const char* output_star = strrchr(pattern, '*');
+
+  int prefix_len = output_star - pattern;
+  int name_len = name_end - name_start;
+  size_t length = strlen(pattern) + prefix_len + name_len + 1;
+  file->destpath_owned = true;
+  file->destpath = calloc(length, sizeof(char));
+
+  // [pattern..output_star][name_start..name_end][output_star+1..]
+  snprintf(file->destpath, length, "%.*s%.*s%s", prefix_len, pattern, name_len, name_start, output_star+1);
+}
+
+int VFSFile_ensureMemory(VFSFile* file){
+  VFSFILE_VALID(file);
+
+  if(file->mem_valid)return 0;
+
+  if(!file->disk_valid){
+    fprintf(stderr, ERROR"we have a file with no valid source '%s'\n", file->path);
+    return -1;
+  }
+
+  file->mem_buffer = sh_readFile(file->disk_path, &file->mem_length);
+  if(file->mem_buffer == NULL)return -1;
+  file->mem_valid = true;
+
+  return 0;
+}
+
+int VFSFile_ensureDisk(VFSFile* file){
+  VFSFILE_VALID(file);
+
+  if(file->disk_valid)return 0;
+
+  if(!file->mem_valid){
+    fprintf(stderr, ERROR"we have a file with no valid source '%s'\n", file->path);
+    return -1;
+  }
+
+  // todo: file->system->uri + file->path?
+  file->disk_path = sh_cachePath(file->mem_buffer, file->mem_length, "");
+  sh_writeFile(file->disk_path, file->mem_buffer, file->mem_length);
+
+  return 0;
+}
+
 void VFSFile_delete(VFSFile* file){
   if(file->path_owned){
     free(file->path);
   }
   if(file->mem_owned){
     free(file->mem_buffer);
+  }
+  if(file->destpath_owned){
+    free(file->destpath);
+  }
+  if(file->disk_valid){
+    free(file->disk_path);
   }
 }
