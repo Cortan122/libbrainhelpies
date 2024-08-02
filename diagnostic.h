@@ -1,7 +1,7 @@
 #pragma once
 
 #ifndef PROGRAM_NAME
-#define PROGRAM_NAME "ConnieCee"
+#define PROGRAM_NAME "BrainHelpies"
 #endif
 
 #define STR_HELPER(x) #x
