@@ -16,3 +16,7 @@ You can just copypaste them into your projects!!
 ## Variables
 
 You can define the `PROGRAM_NAME` and `COLOR(a, b)` preprocessor variables, for some extra fun 🙃
+
+### PS
+
+This project is mostly abandoned, because writing libraries for no reason is hard 🫠. Maybe i'll backport some of my newer stuff here. Like the stb_ds.h with string view compatability. Or maybe not. Who knows.
